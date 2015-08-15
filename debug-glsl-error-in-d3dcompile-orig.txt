@@ -1,27 +1,27 @@
-﻿Shader "Hidden/clouds" {
-	Properties {
-		_MainTex("", 2D) = "white" {}
-	}
-	SubShader {
+#line 8 ""
+#ifdef DUMMY_PREPROCESSOR_TO_WORK_AROUND_HLSL_COMPILER_LINE_HANDLING
+#endif
 
-		Pass {
-			ZTest Always Cull Off ZWrite Off
+#include "HLSLSupport.cginc"
+#include "UnityShaderVariables.cginc"
+#line 8 ""
+#ifdef DUMMY_PREPROCESSOR_TO_WORK_AROUND_HLSL_COMPILER_LINE_HANDLING
+#endif
 
-			CGPROGRAM
-			#pragma vertex vert
-			#pragma fragment frag
-			#pragma target 5.0
+			// #pragma vertex vert
+			// #pragma fragment frag
+			// #pragma target 5.0
 
 			#include "UnityCG.cginc"
+			#include "perlin.cginc"
 
 			uniform sampler2D _MainTex;
-			uniform sampler2D _ValueNoise;
 
 			uniform float _MinHeight;
 			uniform float _MaxHeight;
-			uniform float _FadeDist;
-			uniform float _Scale;
 			uniform float4 _SunDir;
+
+			uniform float _PerlinPersistance;
 
 			uniform float4x4 _FrustumCornersWS;
 			uniform float4 _CameraWS;
@@ -42,66 +42,46 @@
 				o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
 				o.uv = v.texcoord.xy;
 
-#if UNITY_UV_STARTS_AT_TOP
-					o.uv.y = 1 - o.uv.y;
-#endif
-
 				o.ray = _FrustumCornersWS[(int)index];
 				o.ray.w = index;
 
 				return o;
 			}
 
-			float noise(in float3 x) {
-				x *= _Scale;
-				float3 p = floor(x);
-				float3 f = frac(x);
-				f = f*f*(3.0 - 2.0*f);
-				float2 uv = (p.xy + float2(37.0, -17.0)*p.z) + f.xy;
-				float2 rg = tex2Dlod(_ValueNoise, float4((uv + 0.5) / 256.0, 0, 0)).rg;
-				return -1.0 + 2.0*lerp(rg.g, rg.r, f.z);
-			}
-
-			#define NOISEPROC(N, P) 1.75 * N * saturate((_MaxHeight-P.y) / _FadeDist)
-
 			float map5(in float3 q)
 			{
-				float3 p = q;
 				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q); q = q*2.03;
-				f += 0.12500*noise(q); q = q*2.01;
-				f += 0.06250*noise(q); q = q*2.02;
-				f += 0.03125*noise(q);
-				return NOISEPROC(f, p);
+				f =  0.50000*perlin(q); q = q*2.02;
+				f += 0.25000*perlin(q); q = q*2.03;
+				f += 0.12500*perlin(q); q = q*2.01;
+				f += 0.06250*perlin(q); q = q*2.02;
+				f += 0.03125*perlin(q);
+				return clamp(1.5 - q.y - 2.0 + 1.75*f, 0.0, 1.0);
 			}
 
 			float map4(in float3 q)
 			{
-				float3 p = q;
 				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q); q = q*2.03;
-				f += 0.12500*noise(q); q = q*2.01;
-				f += 0.06250*noise(q);
-				return NOISEPROC(f, p);
+				f =  0.50000*perlin(q); q = q*2.02;
+				f += 0.25000*perlin(q); q = q*2.03;
+				f += 0.12500*perlin(q); q = q*2.01;
+				f += 0.06250*perlin(q);
+				return clamp(1.5 - q.y - 2.0 + 1.75*f, 0.0, 1.0);
 			}
 			float map3(in float3 q)
 			{
-				float3 p = q;
 				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q); q = q*2.03;
-				f += 0.12500*noise(q);
-				return NOISEPROC(f, p);
+				f =  0.50000*perlin(q); q = q*2.02;
+				f += 0.25000*perlin(q); q = q*2.03;
+				f += 0.12500*perlin(q);
+				return clamp(1.5 - q.y - 2.0 + 1.75*f, 0.0, 1.0);
 			}
 			float map2(in float3 q)
 			{
-				float3 p = q;
 				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q);;
-				return NOISEPROC(f, p);
+				f =  0.50000*perlin(q); q = q*2.02;
+				f += 0.25000*perlin(q);;
+				return clamp(1.5 - q.y - 2.0 + 1.75*f, 0.0, 1.0);
 			}
 
 			fixed4 integrate(in fixed4 sum, in float dif, in float den, in fixed3 bgcol, in float t)
@@ -119,14 +99,13 @@
 				return sum + col*(1.0 - sum.a);
 			}
 
-#define MARCH(STEPS,MAPLOD) [loop] for(i=0; i<STEPS; i++) { float3 pos = ro + t*rd; if( pos.y<_MinHeight || pos.y>_MaxHeight || sum.a > 0.99 ) {t += max(0.1,0.02*t); continue;} float den = MAPLOD( pos ); if( den>0.01 ) { float dif =  clamp((den - MAPLOD(pos+0.3*_SunDir))/0.6, 0.0, 1.0 ); sum = integrate( sum, dif, den, bgcol, t ); } t += max(0.1,0.02*t); }
+#define MARCH(STEPS,MAPLOD) [loop] for(int i=0; i<STEPS; i++) { float3 pos = ro + t*rd; if( pos.y<_MinHeight || pos.y>_MaxHeight || sum.a > 0.99 ) {t += max(0.1,0.02*t); continue;} float den = MAPLOD( pos ); if( den>0.01 ) { float dif =  clamp((den - MAPLOD(pos+0.3*_SunDir))/0.6, 0.0, 1.0 ); sum = integrate( sum, dif, den, bgcol, t ); } t += max(0.1,0.02*t); }
 
 			fixed4 raymarch(in float3 ro, in float3 rd, in fixed3 bgcol)
 			{
 				fixed4 sum = fixed4(0.0, 0.0, 0.0, 0.0);
 
 				float t = 0.0;
-				int i;
 
 				MARCH(30, map5);
 				MARCH(30, map4);
@@ -150,8 +129,4 @@
 				fixed4 add = raymarch(start, eyeVec, col);
 				return fixed4(col*(1.0-add.w)+add.xyz,1.0);
 			}
-			ENDCG
-		}
-	} 
-	FallBack Off
-}
+			

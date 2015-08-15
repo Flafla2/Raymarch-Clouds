@@ -8,8 +8,8 @@
 uniform sampler2D PERLIN_LOOKUP_GRAD;
 uniform sampler2D PERLIN_LOOKUP_HASH;
 
-inline float grad(float x, float3 point) {
-	return dot(round(tex2D(PERLIN_LOOKUP_GRAD, float2(x/256f, 0)) * 2 - 1), point);
+inline float grad(float x, float3 pt) {
+	return dot(round(tex2Dlod(PERLIN_LOOKUP_GRAD, float4(x/256.0f, 0, 0, 0)) * 2 - 1), pt);
 }
 
 inline float fade(float t) {
@@ -17,13 +17,13 @@ inline float fade(float t) {
 }
 
 inline float p(float x) {
-	return tex2D(PERLIN_LOOKUP_HASH, float2(x / 256f,0)).r * 256f;
+	return tex2Dlod(PERLIN_LOOKUP_HASH, float4(x / 256.0f, 0, 0, 0)).r * 256.0f;
 }
 
 float perlin(float3 pf) {
 	float3 pi = fmod(floor(pf),256.0);
 	pf -= floor(pf);
-	float3 f = fade(pf);
+	float3 f = float3(fade(pf.x), fade(pf.y), fade(pf.z));
 	
 	int a   = p(pi.x) + pi.y;
 	int b   = p(pi.x+1) + pi.y;

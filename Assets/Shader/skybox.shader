@@ -26,7 +26,7 @@
 		half4 frag(v2f i) : COLOR {
 			half3 rd = normalize(i.worldPos.xyz);
 
-			float sun = clamp( dot(float3(_SunDir),rd), 0.0, 1.0 );
+			float sun = clamp( dot((float3)_SunDir,rd), 0.0, 1.0 );
 
 			half3 col = half3(0.6,0.71,0.75) - rd.y*0.2*half3(1.0,0.5,1.0) + 0.15*0.5;
 			col += 0.2*half3(1.0,.6,0.1)*pow( sun, 8.0 );

@@ -7,10 +7,10 @@ public class Clouds : MonoBehaviour {
 	public Shader CloudShader;
 	public float MinHeight = 0.0f;
 	public float MaxHeight = 5.0f;
-	public float PerlinPersistance = 0.25f;
+    public float FadeDist = 2;
+    public float Scale = 5;
 
-	public Texture PerlinLookupHash;
-	public Texture PerlinLookupGradient;
+	public Texture ValueNoiseTable;
 
 	public Transform Sun;
 
@@ -48,7 +48,7 @@ public class Clouds : MonoBehaviour {
 
 	[ImageEffectOpaque]
 	void OnRenderImage (RenderTexture source, RenderTexture destination) {
-		if(Material == null || PerlinLookupHash == null || PerlinLookupGradient == null)
+		if(Material == null || ValueNoiseTable == null)
 		{
             Graphics.Blit (source, destination);
             return;
@@ -57,17 +57,22 @@ public class Clouds : MonoBehaviour {
         if(_Cam == null)
         	_Cam = GetComponent<Camera>();
 
-        Material.SetTexture("_PerlinLookupHash", PerlinLookupHash);
-        Material.SetTexture("_PerlinLookupGrad", PerlinLookupGradient);
+        Material.SetTexture("_ValueNoise", ValueNoiseTable);
 
-		if(Sun != null)
-			Material.SetVector("_SunDir", Sun.forward);
-		else
-			Material.SetVector("_SunDir", -Vector3.up);
-
+		if(Sun != null) {
+            RenderSettings.skybox.SetVector("_SunDir", -Sun.forward);
+            Material.SetVector("_SunDir", -Sun.forward);
+        }
+        else
+        {
+            RenderSettings.skybox.SetVector("_SunDir", Vector3.up);
+            Material.SetVector("_SunDir", Vector3.up);
+        }
+			
 		Material.SetFloat("_MinHeight", MinHeight);
 		Material.SetFloat("_MaxHeight", MaxHeight);
-		Material.SetFloat("_PerlinPersistance", PerlinPersistance);
+        Material.SetFloat("_FadeDist", FadeDist);
+        Material.SetFloat("_Scale", Scale);
 
 		Material.SetMatrix("_FrustumCornersWS", GetFrustumCorners(_Cam));
 		Material.SetVector ("_CameraWS", _Cam.transform.position);
@@ -145,6 +150,8 @@ public class Clouds : MonoBehaviour {
     }
 
     void OnDrawGizmos() {
+        if (_Cam == null)
+            return;
     	Transform camtr = _Cam.transform;
 		float camNear = _Cam.nearClipPlane;
 		float camFar = _Cam.farClipPlane;

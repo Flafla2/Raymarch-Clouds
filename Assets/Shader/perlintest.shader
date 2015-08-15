@@ -30,7 +30,7 @@
                 return o;
             }
             fixed4 frag(fragmentInput i) : SV_Target {
-            	float p = octave_perlin(float3(i.texcoord0.xy*5,_Time.y),ceil((sin(_Time.y)+1)*2.5),0.5);
+				float p = octave_perlin(float3(i.texcoord0.xy * 5, _Time.y), ceil((sin(_Time.y) + 1)*2.5), 0.5);
                 return fixed4(p,p,p,1);
             }
             ENDCG

@@ -6,8 +6,8 @@ Material:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: Skybox
-  m_Shader: {fileID: 4800000, guid: c8ea200f9868b4745aea560b9b9e50f1, type: 3}
+  m_Name: Value Test
+  m_Shader: {fileID: 4800000, guid: e2318ea8f90396e47b7738ba10958ffc, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 5
   m_CustomRenderQueue: -1
@@ -80,16 +80,9 @@ Material:
           m_Offset: {x: 0, y: 0}
       data:
         first:
-          name: _PerlinLookupGrad
+          name: _ValueNoise
         second:
-          m_Texture: {fileID: 0}
-          m_Scale: {x: 1, y: 1}
-          m_Offset: {x: 0, y: 0}
-      data:
-        first:
-          name: _PerlinLookupHash
-        second:
-          m_Texture: {fileID: 0}
+          m_Texture: {fileID: 2800000, guid: f8b2ba9a90eb4b14485108e56a83ca51, type: 3}
           m_Scale: {x: 1, y: 1}
           m_Offset: {x: 0, y: 0}
     m_Floats:
@@ -101,6 +94,10 @@ Material:
         first:
           name: _DstBlend
         second: 0
+      data:
+        first:
+          name: _Scale
+        second: 10.6199999
       data:
         first:
           name: _Cutoff
@@ -141,26 +138,6 @@ Material:
         first:
           name: _Metallic
         second: 0
-      data:
-        first:
-          name: _MinHeight
-        second: 0
-      data:
-        first:
-          name: _MaxHeight
-        second: 5
-      data:
-        first:
-          name: _PerlinPersistance
-        second: .25
-      data:
-        first:
-          name: _MaxDist
-        second: 80
-      data:
-        first:
-          name: _MaxLOD
-        second: 5
     m_Colors:
       data:
         first:
@@ -170,7 +147,3 @@ Material:
         first:
           name: _Color
         second: {r: 1, g: 1, b: 1, a: 1}
-      data:
-        first:
-          name: _SunDir
-        second: {r: .321393788, g: .766044497, b: -.556670308, a: 0}
