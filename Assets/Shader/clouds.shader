@@ -64,45 +64,60 @@
 
 			#define NOISEPROC(N, P) 1.75 * N * saturate((_MaxHeight-P.y) / _FadeDist)
 
-			float map5(in float3 q)
-			{
-				float3 p = q;
-				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q); q = q*2.03;
-				f += 0.12500*noise(q); q = q*2.01;
-				f += 0.06250*noise(q); q = q*2.02;
-				f += 0.03125*noise(q);
-				return NOISEPROC(f, p);
-			}
+			interface IMap {
+				float map(in float3 q);
+			};
 
-			float map4(in float3 q)
-			{
-				float3 p = q;
-				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q); q = q*2.03;
-				f += 0.12500*noise(q); q = q*2.01;
-				f += 0.06250*noise(q);
-				return NOISEPROC(f, p);
-			}
-			float map3(in float3 q)
-			{
-				float3 p = q;
-				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q); q = q*2.03;
-				f += 0.12500*noise(q);
-				return NOISEPROC(f, p);
-			}
-			float map2(in float3 q)
-			{
-				float3 p = q;
-				float f;
-				f = 0.50000*noise(q); q = q*2.02;
-				f += 0.25000*noise(q);;
-				return NOISEPROC(f, p);
-			}
+			class Map5 : IMap {
+				float map(in float3 q)
+				{
+					float3 p = q;
+					float f;
+					f = 0.50000*noise(q); q = q*2.02;
+					f += 0.25000*noise(q); q = q*2.03;
+					f += 0.12500*noise(q); q = q*2.01;
+					f += 0.06250*noise(q); q = q*2.02;
+					f += 0.03125*noise(q);
+					return NOISEPROC(f, p);
+				}
+			};
+			
+
+			class Map4 : IMap {
+				float map(in float3 q)
+				{
+					float3 p = q;
+					float f;
+					f = 0.50000*noise(q); q = q*2.02;
+					f += 0.25000*noise(q); q = q*2.03;
+					f += 0.12500*noise(q); q = q*2.01;
+					f += 0.06250*noise(q);
+					return NOISEPROC(f, p);
+				}
+			};
+
+			class Map3 : IMap {
+				float map(in float3 q)
+				{
+					float3 p = q;
+						float f;
+					f = 0.50000*noise(q); q = q*2.02;
+					f += 0.25000*noise(q); q = q*2.03;
+					f += 0.12500*noise(q);
+					return NOISEPROC(f, p);
+				}
+			};
+			
+			class Map2 : IMap {
+				float map(in float3 q)
+				{
+					float3 p = q;
+						float f;
+					f = 0.50000*noise(q); q = q*2.02;
+					f += 0.25000*noise(q);;
+					return NOISEPROC(f, p);
+				}
+			};
 
 			fixed4 integrate(in fixed4 sum, in float dif, in float den, in fixed3 bgcol, in float t)
 			{
@@ -119,7 +134,23 @@
 				return sum + col*(1.0 - sum.a);
 			}
 
-#define MARCH(STEPS,MAPLOD) [loop] for(i=0; i<STEPS; i++) { float3 pos = ro + t*rd; if( pos.y<_MinHeight || pos.y>_MaxHeight || sum.a > 0.99 ) {t += max(0.1,0.02*t); continue;} float den = MAPLOD( pos ); if( den>0.01 ) { float dif =  clamp((den - MAPLOD(pos+0.3*_SunDir))/0.6, 0.0, 1.0 ); sum = integrate( sum, dif, den, bgcol, t ); } t += max(0.1,0.02*t); }
+			inline void march(in int steps, in IMap map, in float3 ro, in float3 rd, in fixed3 bgcol, inout fixed4 sum, inout float t) {
+				[loop]
+				for (int i = 0; i<steps; i++) {
+					float3 pos = ro + t*rd;
+					if (pos.y<_MinHeight || pos.y>_MaxHeight || sum.a > 0.99) {
+						t += max(0.1, 0.02*t);
+						continue;
+					}
+					float den = map.map(pos);
+					if (den>0.01)
+					{
+						float dif = clamp((den - map.map(pos + 0.3*_SunDir)) / 0.6, 0.0, 1.0);
+						sum = integrate(sum, dif, den, bgcol, t);
+					}
+					t += max(0.1, 0.02*t);
+				}
+			}
 
 			fixed4 raymarch(in float3 ro, in float3 rd, in fixed3 bgcol)
 			{
@@ -128,10 +159,15 @@
 				float t = 0.0;
 				int i;
 
-				MARCH(30, map5);
-				MARCH(30, map4);
-				MARCH(30, map3);
-				MARCH(30, map2);
+				Map5 m5;
+				Map4 m4;
+				Map3 m3;
+				Map2 m2;
+
+				march(30, m5, ro, rd, bgcol, sum, t);
+				march(30, m4, ro, rd, bgcol, sum, t);
+				march(30, m3, ro, rd, bgcol, sum, t);
+				march(30, m2, ro, rd, bgcol, sum, t);
 
 				return clamp(sum, 0.0, 1.0);
 			}

@@ -66,7 +66,8 @@ public class Clouds : MonoBehaviour {
         else
         {
             RenderSettings.skybox.SetVector("_SunDir", Vector3.up);
-            Material.SetVector("_SunDir", Vector3.up);
+            Material.SetVector("_SunDir", 
+                Vector3.up);
         }
 			
 		Material.SetFloat("_MinHeight", MinHeight);
