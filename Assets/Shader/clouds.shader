@@ -1,4 +1,6 @@
-﻿Shader "Hidden/clouds" {
+﻿// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
+
+Shader "Hidden/clouds" {
 	Properties {
 		_MainTex("", 2D) = "white" {}
 	}
@@ -14,7 +16,10 @@
 
 			#include "UnityCG.cginc"
 
+			uniform sampler2D _CameraDepthTexture;
+
 			uniform sampler2D _MainTex;
+			uniform float4 _MainTex_TexelSize;
 			uniform sampler2D _ValueNoise;
 
 			uniform float _MinHeight;
@@ -25,6 +30,8 @@
 
 			uniform float4x4 _FrustumCornersWS;
 			uniform float4 _CameraWS;
+
+			uniform float4x4 _CameraInvViewMatrix;
 
 			struct v2f {
 				float4 pos : SV_POSITION;
@@ -39,15 +46,17 @@
 				half index = v.vertex.z;
 				v.vertex.z = 0.1;
 
-				o.pos = mul(UNITY_MATRIX_MVP, v.vertex);
+				o.pos = UnityObjectToClipPos(v.vertex);
 				o.uv = v.texcoord.xy;
 
 #if UNITY_UV_STARTS_AT_TOP
+				if(_MainTex_TexelSize.y < 0)
 					o.uv.y = 1 - o.uv.y;
 #endif
 
 				o.ray = _FrustumCornersWS[(int)index];
-				o.ray.w = index;
+				o.ray /= abs(o.ray.z);
+				o.ray = mul(_CameraInvViewMatrix, o.ray);
 
 				return o;
 			}
@@ -64,60 +73,47 @@
 
 			#define NOISEPROC(N, P) 1.75 * N * saturate((_MaxHeight-P.y) / _FadeDist)
 
-			interface IMap {
-				float map(in float3 q);
-			};
-
-			class Map5 : IMap {
-				float map(in float3 q)
-				{
-					float3 p = q;
-					float f;
-					f = 0.50000*noise(q); q = q*2.02;
-					f += 0.25000*noise(q); q = q*2.03;
-					f += 0.12500*noise(q); q = q*2.01;
-					f += 0.06250*noise(q); q = q*2.02;
-					f += 0.03125*noise(q);
-					return NOISEPROC(f, p);
-				}
-			};
+			float map5(in float3 q)
+			{
+				float3 p = q;
+				float f;
+				f = 0.50000*noise(q); q = q*2.02;
+				f += 0.25000*noise(q); q = q*2.03;
+				f += 0.12500*noise(q); q = q*2.01;
+				f += 0.06250*noise(q); q = q*2.02;
+				f += 0.03125*noise(q);
+				return NOISEPROC(f, p);
+			}
 			
+			float map4(in float3 q)
+			{
+				float3 p = q;
+				float f;
+				f = 0.50000*noise(q); q = q*2.02;
+				f += 0.25000*noise(q); q = q*2.03;
+				f += 0.12500*noise(q); q = q*2.01;
+				f += 0.06250*noise(q);
+				return NOISEPROC(f, p);
+			}
 
-			class Map4 : IMap {
-				float map(in float3 q)
-				{
-					float3 p = q;
+			float map3(in float3 q)
+			{
+				float3 p = q;
 					float f;
-					f = 0.50000*noise(q); q = q*2.02;
-					f += 0.25000*noise(q); q = q*2.03;
-					f += 0.12500*noise(q); q = q*2.01;
-					f += 0.06250*noise(q);
-					return NOISEPROC(f, p);
-				}
-			};
-
-			class Map3 : IMap {
-				float map(in float3 q)
-				{
-					float3 p = q;
-						float f;
-					f = 0.50000*noise(q); q = q*2.02;
-					f += 0.25000*noise(q); q = q*2.03;
-					f += 0.12500*noise(q);
-					return NOISEPROC(f, p);
-				}
-			};
+				f = 0.50000*noise(q); q = q*2.02;
+				f += 0.25000*noise(q); q = q*2.03;
+				f += 0.12500*noise(q);
+				return NOISEPROC(f, p);
+			}
 			
-			class Map2 : IMap {
-				float map(in float3 q)
-				{
-					float3 p = q;
-						float f;
-					f = 0.50000*noise(q); q = q*2.02;
-					f += 0.25000*noise(q);;
-					return NOISEPROC(f, p);
-				}
-			};
+			float map2(in float3 q)
+			{
+				float3 p = q;
+					float f;
+				f = 0.50000*noise(q); q = q*2.02;
+				f += 0.25000*noise(q);;
+				return NOISEPROC(f, p);
+			}
 
 			fixed4 integrate(in fixed4 sum, in float dif, in float den, in fixed3 bgcol, in float t)
 			{
@@ -134,40 +130,35 @@
 				return sum + col*(1.0 - sum.a);
 			}
 
-			inline void march(in int steps, in IMap map, in float3 ro, in float3 rd, in fixed3 bgcol, inout fixed4 sum, inout float t) {
-				[loop]
-				for (int i = 0; i<steps; i++) {
-					float3 pos = ro + t*rd;
-					if (pos.y<_MinHeight || pos.y>_MaxHeight || sum.a > 0.99) {
-						t += max(0.1, 0.02*t);
-						continue;
-					}
-					float den = map.map(pos);
-					if (den>0.01)
-					{
-						float dif = clamp((den - map.map(pos + 0.3*_SunDir)) / 0.6, 0.0, 1.0);
-						sum = integrate(sum, dif, den, bgcol, t);
-					}
-					t += max(0.1, 0.02*t);
-				}
+			#define MARCH(steps, map, ro, rd, bgcol, sum, depth, t) { \
+				for (int i = 0; i<steps; i++) { \
+				    if(t > depth) \
+						break; \
+					float3 pos = ro + t*rd; \
+					if (pos.y<_MinHeight || pos.y>_MaxHeight || sum.a > 0.99) { \
+						t += max(0.1, 0.02*t); \
+						continue; \
+					} \
+					float den = map(pos); \
+					if (den>0.01) \
+					{ \
+						float dif = clamp((den - map(pos + 0.3*_SunDir)) / 0.6, 0.0, 1.0); \
+						sum = integrate(sum, dif, den, bgcol, t); \
+					} \
+					t += max(0.1, 0.02*t); \
+				} \
 			}
 
-			fixed4 raymarch(in float3 ro, in float3 rd, in fixed3 bgcol)
+			fixed4 raymarch(in float3 ro, in float3 rd, in fixed3 bgcol, in float depth)
 			{
 				fixed4 sum = fixed4(0.0, 0.0, 0.0, 0.0);
 
-				float t = 0.0;
-				int i;
+				float ct = 0.0;
 
-				Map5 m5;
-				Map4 m4;
-				Map3 m3;
-				Map2 m2;
-
-				march(30, m5, ro, rd, bgcol, sum, t);
-				march(30, m4, ro, rd, bgcol, sum, t);
-				march(30, m3, ro, rd, bgcol, sum, t);
-				march(30, m2, ro, rd, bgcol, sum, t);
+				MARCH(30, map5, ro, rd, bgcol, sum, depth, ct)
+				MARCH(30, map4, ro, rd, bgcol, sum, depth, ct)
+				MARCH(30, map3, ro, rd, bgcol, sum, depth, ct)
+				MARCH(30, map2, ro, rd, bgcol, sum, depth, ct)
 
 				return clamp(sum, 0.0, 1.0);
 			}
@@ -177,13 +168,22 @@
 
 				float3 start = _CameraWS;
 
+				float2 duv = i.uv;
+				#if UNITY_UV_STARTS_AT_TOP
+				if (_MainTex_TexelSize.y < 0)
+					duv.y = 1 - duv.y;
+				#endif
+
 				// if(start.y > _MaxHeight+0.001)
 				// 	start += eyeVec / abs(eyeVec.y) * abs(start.y - _MaxHeight);
 				// else if(start.y < _MinHeight-0.001)
 				// 	start += eyeVec / abs(eyeVec.y) * abs(start.y - _MinHeight);
 
+				float depth = LinearEyeDepth(tex2D(_CameraDepthTexture, duv).r);
+				depth *= length(i.ray);
+
 				fixed3 col = tex2D(_MainTex,i.uv);
-				fixed4 add = raymarch(start, eyeVec, col);
+				fixed4 add = raymarch(start, eyeVec, col, depth);
 				return fixed4(col*(1.0-add.w)+add.xyz,1.0);
 			}
 			ENDCG

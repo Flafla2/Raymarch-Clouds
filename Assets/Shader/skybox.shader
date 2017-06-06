@@ -1,4 +1,7 @@
-﻿Shader "Custom/skybox" {
+﻿// Upgrade NOTE: replaced '_Object2World' with 'unity_ObjectToWorld'
+// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
+
+Shader "Custom/skybox" {
 	Properties {
 		_SunDir ("Sun Direction", Vector) = (-1.0, -1.0, 0.0, 1.0)
 	}
@@ -18,8 +21,13 @@
 
 		v2f vert(float4 pos : POSITION) {
 			v2f ret;
-			ret.pos = mul(UNITY_MATRIX_MVP, pos);
-			ret.worldPos = mul(_Object2World,pos);
+			ret.pos = UnityObjectToClipPos(pos);
+
+			#if UNITY_UV_STARTS_AT_TOP
+			ret.pos.y = 1 - ret.pos.y;
+			#endif
+
+			ret.worldPos = mul(unity_ObjectToWorld,pos);
 			return ret;
 		}
 
